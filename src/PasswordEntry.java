@@ -5,10 +5,14 @@ public class PasswordEntry {
   private String site;
   private String notes;
 
-  PasswordEntry(String username, String password, String site, String notes) {
+  public PasswordEntry(String username, String password, String site, String notes) {
     this.username = username;
-    this.password = password;
+    this.password = hashPassword(password);
     this.site = site;
     this.notes = notes;
+  }
+
+  private String hashPassword(String plaintext_password) {
+    return "";
   }
 }
