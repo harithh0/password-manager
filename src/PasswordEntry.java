@@ -15,4 +15,24 @@ public class PasswordEntry {
   private String hashPassword(String plaintext_password) {
     return "";
   }
+
+  public String getUsername() {
+    return this.username;
+  }
+  ;
+
+  public String getPassword() {
+    return this.password;
+  }
+  ;
+
+  public String getSite() {
+    return this.site;
+  }
+  ;
+
+  public String getNotes() {
+    return this.notes;
+  }
+  ;
 }
