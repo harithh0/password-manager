@@ -17,19 +17,32 @@ public class DatabaseUtil {
       // Connect (creates DB file if it doesn't exist)
       this.connection = DriverManager.getConnection(DB_URL);
 
-      String createTable =
+      String create_password_entries_table =
           """
           CREATE TABLE IF NOT EXISTS password_entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            site TEXT NOT NULL,
-            username TEXT NOT NULL,
-            password TEXT NOT NULL,
-            notes TEXT
+            user_id INTEGER,
+            site BLOB NOT NULL,
+            username BLOB NOT NULL,
+            password BLOB NOT NULL,
+            notes BLOB,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+          );
+          """;
+
+      String create_users_table =
+          """
+          CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password BLOB NOT NULL,
+            salt TEXT
           );
           """;
 
       try (Statement stmt = this.connection.createStatement()) {
-        stmt.execute(createTable);
+        stmt.execute(create_password_entries_table);
+        stmt.execute(create_users_table);
       }
 
       return 0;
@@ -150,4 +163,14 @@ public class DatabaseUtil {
    * Save password entry
    * Delete password entry
    */
+
+  public void handleLogin(String username, String password) {
+
+    System.out.print("Username: ");
+  }
+
+  public void handleSignup(String username, String password) {
+
+    System.out.print("Username: ");
+  }
 }
