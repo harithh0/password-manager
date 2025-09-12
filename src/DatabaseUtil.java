@@ -54,8 +54,7 @@ public class DatabaseUtil {
         "INSERT INTO password_entries(site, username, password, notes) VALUES (?, ?, ?, ?)";
 
     // NOTE: Put expression inside 'try' so it can automatically close at the end of
-    // the
-    // block, even if it throws error. Similar to 'with' in python
+    // the block, even if it throws error. Similar to 'with' in python
 
     try (PreparedStatement stmt = this.connection.prepareStatement(sql)) {
       stmt.setString(1, entry.getSite());
@@ -112,8 +111,15 @@ public class DatabaseUtil {
     return entries;
   }
 
-  public void deleteEntry(String entry_id) {
-    String sql_stmt = "SELECT * FROM password_entries WHERE id=?";
+  public void deleteEntry(int entry_id) {
+    String sql_stmt = "DELETE FROM password_entries WHERE id=?";
+
+    try (PreparedStatement stmt = this.connection.prepareStatement(sql_stmt)) {
+      stmt.setInt(1, entry_id);
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
   }
 
   // WARN: insecure, cause of .formatted use can do ' OR 1=1 --
