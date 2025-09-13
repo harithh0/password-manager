@@ -1,3 +1,7 @@
+## Secure Password Manager
+
+- Encrypted password manager cli program
+
 
 ## Showcase 
 
