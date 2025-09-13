@@ -177,11 +177,11 @@ public class DatabaseUtil {
     return entries;
   }
 
-  public void deleteEntry(int entry_id) {
-    String sql_stmt = "DELETE FROM password_entries WHERE id=?";
+  public void deleteEntry(String entry_id) {
+    String sql_update_stmnt = "DELETE FROM password_entries WHERE id=?";
 
-    try (PreparedStatement stmt = this.connection.prepareStatement(sql_stmt)) {
-      stmt.setInt(1, entry_id);
+    try (PreparedStatement stmt = this.connection.prepareStatement(sql_update_stmnt)) {
+      stmt.setInt(1, Integer.parseInt(entry_id));
       stmt.executeUpdate();
     } catch (SQLException e) {
       e.printStackTrace();
@@ -339,7 +339,7 @@ public class DatabaseUtil {
 
   }
 
-  public void createUser(String username, String hashed_password, byte[] salt) {
+  public int createUser(String username, String hashed_password, byte[] salt) {
 
     String sql_smnt = "INSERT INTO users(username, password, salt) VALUES(?, ?, ?)";
 
@@ -349,13 +349,37 @@ public class DatabaseUtil {
       stmt.setBytes(3, salt);
 
       stmt.executeUpdate();
+      return 0;
+
+    } catch (SQLException e) {
+      if (e.getMessage().contains("UNIQUE constraint failed")) {
+        return 1;
+      } else {
+        e.printStackTrace();
+        return 2;
+      }
+    }
+  }
+
+  public int getUserID(String username) {
+    String sql_query = "SELECT id FROM users WHERE username=?";
+
+    try (PreparedStatement stmt = this.connection.prepareStatement(sql_query)) {
+      stmt.setString(1, username);
+
+      ResultSet rs = stmt.executeQuery();
+      if (rs.next()) {
+        int id = rs.getInt(1);
+        return id;
+      }
+
     } catch (SQLException e) {
       e.printStackTrace();
     }
-
+    return -1;
   }
 
-  public void handleSignup(String username, String password) {
+  public int handleSignup(String username, String password) {
     SecureRandom random = new SecureRandom();
     byte[] salt = new byte[16];
     random.nextBytes(salt);
@@ -364,11 +388,20 @@ public class DatabaseUtil {
       SecretKey key = deriveEncryptionKey(password, salt);
 
       // write hashed password, username, and salt in users table
-      createUser(username, hashed_password, salt);
+      int status = createUser(username, hashed_password, salt);
+      if (status != 0) {
+        return status;
+      }
+
+      // sets object variables
       this.user_key = key;
+      this.username = username;
+      this.user_id = getUserID(username);
+      return 0;
 
     } catch (Exception e) {
-      System.err.println(e);
+      e.printStackTrace();
+      return 2;
     }
 
   }

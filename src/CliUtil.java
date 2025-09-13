@@ -18,8 +18,22 @@ public class CliUtil {
     for (String[] x : entries) {
 
       at.addRule();
-      at.addRow(x[0], x[1], x[2], "*****", x[4]);
+      at.addRow(x[0], x[1], x[2], "*******", x[4]);
     }
+
+    at.addRule();
+
+    System.out.println(at.render());
+  }
+
+  public void displayOneEntry(String[] entries) {
+
+    AsciiTable at = new AsciiTable();
+    at.addRule();
+    at.addRow("ID", "Site", "Username", "Password", "Notes");
+
+    at.addRule();
+    at.addRow(entries[0], entries[1], entries[2], entries[3], entries[4]);
 
     at.addRule();
 
@@ -46,8 +60,21 @@ public class CliUtil {
     System.out.printf("Enter notes (optional): ");
     notes = scanner.nextLine();
 
-    System.out.println("Entry added successfully");
     PasswordEntry password_entry = new PasswordEntry(username, password, site, notes);
     return password_entry;
+  }
+
+  public String[] handleGetSpecificEntry(String[][] entries) {
+
+    Scanner scanner = new Scanner(System.in);
+    int choice;
+    System.out.print("Enter entry ID: ");
+    choice = scanner.nextInt();
+    for (String[] l : entries) {
+      if (l[0].equals(Integer.toString(choice))) {
+        return l;
+      }
+    }
+    return null;
   }
 }

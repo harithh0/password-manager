@@ -1,13 +1,32 @@
 import java.util.Scanner;
 
+// for copying to clipboard
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Clipboard;
+
+// for Ansi Escape coloring
+import org.fusesource.jansi.Ansi;
+import static org.fusesource.jansi.Ansi.Color.*;
+
+import java.io.Console;
+
 public class Main {
   private static final String DB_URL = "jdbc:sqlite:test.db";
+  private static DatabaseUtil db = new DatabaseUtil(DB_URL);
+  private static Scanner scanner = new Scanner(System.in);
+
+  private static void cleanUp(boolean error) {
+    db.closeDB();
+    scanner.close();
+    if (error) {
+      System.exit(1);
+    } else {
+      System.exit(0);
+    }
+  }
 
   public static void main(String[] args) {
-
-    PasswordEntry pass = new PasswordEntry("hi2", "a", "b", "c");
-    DatabaseUtil db = new DatabaseUtil(DB_URL);
-    Scanner scanner = new Scanner(System.in);
 
     CliUtil cli = new CliUtil();
 
@@ -19,27 +38,39 @@ public class Main {
     scanner.nextLine();
 
     // WARN: CHANGE
-    String username = "harith";
-    String password = "123";
-    // System.out.print("Username: ");
-    // username = scanner.nextLine();
-    // System.out.print("Password: ");
-    // password = scanner.nextLine();
+    // String username = "harith";
+    // String password = "123";
+    String username, password;
+    System.out.print("Username: ");
+    username = scanner.nextLine();
+
+    Console console = System.console();
+    char[] passwordChars = console.readPassword("Password: ");
+    password = new String(passwordChars);
 
     System.out.printf("DEBUG: %s %s %d\n", username, password, user_choice);
     if (user_choice == 0) {
       int result = db.handleLogin(username, password);
       if (result != 0) {
-        db.closeDB();
-        // TODO: should do clean function
-        System.exit(1);
+        cleanUp(true);
       }
     } else if (user_choice == 1) {
-      db.handleSignup(username, password);
+      int result = db.handleSignup(username, password);
+      System.out.println("Result " + result);
+      if (result == 1) {
+        System.out.println(Ansi.ansi().fg(RED).a("[-] Username is already taken").reset());
+        cleanUp(true);
+      } else if (result == 2) {
+        System.out.println(Ansi.ansi().fg(RED).a("[-] Something went wrong").reset());
+        cleanUp(true);
+      }
+
     }
 
     int user_action_choice;
     boolean running = true;
+
+    String[][] entries;
     while (running) {
       System.out.printf(
           "Choices: \n"
@@ -53,12 +84,14 @@ public class Main {
 
       user_action_choice = scanner.nextInt();
       scanner.nextLine(); // consume the leftover newline
-      String[][] entries;
+
+      // updates each loop
+      entries = db.getEntries();
+
       switch (user_action_choice) {
         case 0 -> {
-          entries = db.getEntries();
           if (entries == null) {
-            System.out.println("~~ No entries found for your account ~~");
+            System.out.println(Ansi.ansi().fg(RED).a("~~ No entries found for your account ~~").reset());
           } else {
             cli.displayEntries(entries);
           }
@@ -66,19 +99,54 @@ public class Main {
         case 1 -> {
           PasswordEntry entry_data = cli.handleAddEntry();
           db.insertEntry(entry_data);
+          System.out.println(Ansi.ansi().fg(BLUE).a("[+] Entry added successfully").reset());
         }
-        case 2 -> {}
-        case 3 -> {
-          int choice;
-          System.out.print("Enter entry ID: ");
-          choice = scanner.nextInt();
-          System.out.println(Integer.toString(choice));
-          entries = db.getEntries();
-          for (String[] l : entries) {
-            if (l[0].equals(Integer.toString(choice))) {
-              System.out.println("Password: " + l[3]);
-            }
+        case 2 -> {
+          if (entries == null) {
+            System.out.println(Ansi.ansi().fg(RED).a("~~ No entries found for your account ~~").reset());
+            break;
           }
+          String[] chosen_entry = cli.handleGetSpecificEntry(entries);
+          if (chosen_entry != null) {
+            db.deleteEntry(chosen_entry[0]);
+            System.out.println(Ansi.ansi().fg(BLUE).a("[+] Entry deleted!").reset());
+          } else {
+            System.out.println(Ansi.ansi().fg(RED).a("[-] Entry does not exist").reset());
+
+          }
+        }
+        case 3 -> {
+
+          if (entries == null) {
+            System.out.println(Ansi.ansi().fg(RED).a("~~ No entries found for your account ~~").reset());
+            break;
+          }
+          String[] chosen_entry = cli.handleGetSpecificEntry(entries);
+          if (chosen_entry != null) {
+            cli.displayOneEntry(chosen_entry);
+          } else {
+            System.out.println(Ansi.ansi().fg(RED).a("[-] Entry does not exist").reset());
+          }
+        }
+        case 4 -> {
+
+          if (entries == null) {
+            System.out.println(Ansi.ansi().fg(RED).a("~~ No entries found for your account ~~").reset());
+            break;
+          }
+          String[] chosen_entry = cli.handleGetSpecificEntry(entries);
+          if (chosen_entry != null) {
+
+            // clipboard impl
+            StringSelection selection = new StringSelection(chosen_entry[3]);
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            clipboard.setContents(selection, null);
+
+            System.out.println(Ansi.ansi().fg(BLUE).a("[+] Copied to clipboard!").reset());
+          } else {
+            System.out.println(Ansi.ansi().fg(RED).a("[-] Entry does not exist").reset());
+          }
+
         }
         case 5 -> {
           running = false;
@@ -88,8 +156,8 @@ public class Main {
       }
     }
 
-    db.closeDB();
-    scanner.close();
+    // Do cleanup here
+    cleanUp(false);
 
     /*
      * Workflow
@@ -105,9 +173,6 @@ public class Main {
      *
      *
      */
-
-    // String[][] entries = db.getEntries();
-    // cli.displayEntries(entries);
 
   }
 }
