@@ -7,13 +7,9 @@ public class PasswordEntry {
 
   public PasswordEntry(String username, String password, String site, String notes) {
     this.username = username;
-    this.password = hashPassword(password);
+    this.password = password;
     this.site = site;
     this.notes = notes;
-  }
-
-  private String hashPassword(String plaintext_password) {
-    return "";
   }
 
   public String getUsername() {

@@ -11,11 +11,17 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.sql.*;
 
+// for encryption / decryption
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+
 public class DatabaseUtil {
 
   private String DB_URL;
   private Connection connection;
   private SecretKey user_key;
+  private String username;
+  private int user_id;
 
   DatabaseUtil(String db_url) {
     this.DB_URL = db_url;
@@ -73,19 +79,38 @@ public class DatabaseUtil {
   }
 
   public void insertEntry(PasswordEntry entry) {
-    String sql = "INSERT INTO password_entries(site, username, password, notes) VALUES (?, ?, ?, ?)";
+    String sql = "INSERT INTO password_entries(user_id ,site, username, password, notes) VALUES (?, ?, ?, ?, ?)";
 
     // NOTE: Put expression inside 'try' so it can automatically close at the end of
     // the block, even if it throws error. Similar to 'with' in python
 
-    try (PreparedStatement stmt = this.connection.prepareStatement(sql)) {
-      stmt.setString(1, entry.getSite());
-      stmt.setString(2, entry.getUsername());
-      stmt.setString(3, entry.getPassword());
-      stmt.setString(4, entry.getNotes());
+    try {
 
-      stmt.executeUpdate();
-    } catch (SQLException e) {
+      byte[] encrypted_site = encryptAESGCM(entry.getSite());
+      byte[] encrypted_username = encryptAESGCM(entry.getUsername());
+      byte[] encrypted_password = encryptAESGCM(entry.getPassword());
+
+      byte[] encrypted_notes;
+
+      try (PreparedStatement stmt = this.connection.prepareStatement(sql)) {
+        stmt.setInt(1, this.user_id);
+        stmt.setBytes(2, encrypted_site);
+        stmt.setBytes(3, encrypted_username);
+        stmt.setBytes(4, encrypted_password);
+
+        if (!entry.getNotes().isBlank()) {
+          encrypted_notes = encryptAESGCM(entry.getNotes());
+          stmt.setBytes(5, encrypted_notes);
+        } else {
+          // empty
+          stmt.setBytes(5, null);
+        }
+
+        stmt.executeUpdate();
+      } catch (SQLException e) {
+        e.printStackTrace();
+      }
+    } catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -93,38 +118,57 @@ public class DatabaseUtil {
   public String[][] getEntries() {
 
     // 1.) Count how many entires there are
-    String sql_row_count_query = "SELECT COUNT(*) FROM password_entries";
+    String sql_row_count_query = "SELECT COUNT(*) FROM password_entries WHERE user_id=?";
     int count = 0;
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql_row_count_query)) {
+    try (PreparedStatement stmt = this.connection.prepareStatement(sql_row_count_query)) {
+      stmt.setInt(1, this.user_id);
+
+      ResultSet rs = stmt.executeQuery();
       if (rs.next()) {
         count = rs.getInt(1); // get value of the first column
       }
-
     } catch (SQLException e) {
       e.printStackTrace();
+    }
+
+    if (count == 0) {
+      // if no entries
+      return null;
     }
 
     // 2.) Create 2D array to hold x amount of entries
     String[][] entries = new String[count][5];
 
     // 3.) Fill 2D array with entries
-    String sql_query = "SELECT * FROM password_entries";
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql_query)) {
+    String sql_query = "SELECT * FROM password_entries WHERE user_id=?";
+    try (PreparedStatement stmt = this.connection.prepareStatement(sql_query)) {
+      stmt.setInt(1, this.user_id);
+      ResultSet rs = stmt.executeQuery();
       int i = 0;
       while (rs.next()) {
         int id = rs.getInt(1);
-        String site = rs.getString("site");
-        String username = rs.getString("username");
-        String password = rs.getString("password");
-        String notes = rs.getString("notes");
-        entries[i][0] = Integer.toString(id);
-        entries[i][1] = site;
-        entries[i][2] = username;
-        entries[i][3] = password;
-        entries[i][4] = notes;
-        i++;
+        try {
+
+          String site = decryptAESGCM(rs.getBytes("site"));
+          String username = decryptAESGCM(rs.getBytes("username"));
+          String password = decryptAESGCM(rs.getBytes("password"));
+          byte[] notes = rs.getBytes("notes");
+
+          entries[i][0] = Integer.toString(id);
+          entries[i][1] = site;
+          entries[i][2] = username;
+          entries[i][3] = password;
+
+          if (notes == null) {
+            entries[i][4] = "";
+          } else {
+            entries[i][4] = decryptAESGCM(notes);
+          }
+          i++;
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+
       }
 
     } catch (SQLException e) {
@@ -181,13 +225,42 @@ public class DatabaseUtil {
     return Base64.getEncoder().encodeToString(hash);
   }
 
-  public static SecretKey deriveEncryptionKey(String password, byte[] salt) throws Exception {
+  public SecretKey deriveEncryptionKey(String password, byte[] salt) throws Exception {
     int iterations = 65536;
     int keyLength = 256;
     PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, keyLength);
     SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
     byte[] keyBytes = skf.generateSecret(spec).getEncoded();
     return new SecretKeySpec(keyBytes, "AES");
+  }
+
+  public byte[] encryptAESGCM(String plaintext) throws Exception {
+    byte[] iv = new byte[12]; // 96-bit IV
+    new SecureRandom().nextBytes(iv);
+
+    Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+    GCMParameterSpec spec = new GCMParameterSpec(128, iv); // 128-bit auth tag
+    cipher.init(Cipher.ENCRYPT_MODE, this.user_key, spec);
+
+    byte[] ciphertext = cipher.doFinal(plaintext.getBytes());
+
+    // Prepend IV to ciphertext for storage
+    byte[] result = new byte[iv.length + ciphertext.length];
+    System.arraycopy(iv, 0, result, 0, iv.length);
+    System.arraycopy(ciphertext, 0, result, iv.length, ciphertext.length);
+    return result;
+  }
+
+  public String decryptAESGCM(byte[] data) throws Exception {
+    byte[] iv = new byte[12];
+    System.arraycopy(data, 0, iv, 0, 12);
+    byte[] ciphertext = new byte[data.length - 12];
+    System.arraycopy(data, 12, ciphertext, 0, ciphertext.length);
+
+    Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+    GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+    cipher.init(Cipher.DECRYPT_MODE, this.user_key, spec);
+    return new String(cipher.doFinal(ciphertext));
   }
 
   public int handleLogin(String username, String password) {
@@ -239,6 +312,8 @@ public class DatabaseUtil {
           String hashed_password = result.getString(3);
           if (user_provided_password_hashed.equals(hashed_password)) {
             this.user_key = deriveEncryptionKey(password, salt);
+            this.username = username;
+            this.user_id = result.getInt(1);
             System.out.println("Correct");
             return 0;
           } else {
@@ -297,4 +372,5 @@ public class DatabaseUtil {
     }
 
   }
+
 }
