@@ -48,7 +48,6 @@ public class Main {
     char[] passwordChars = console.readPassword("Password: ");
     password = new String(passwordChars);
 
-    System.out.printf("DEBUG: %s %s %d\n", username, password, user_choice);
     if (user_choice == 0) {
       int result = db.handleLogin(username, password);
       if (result != 0) {
@@ -56,7 +55,6 @@ public class Main {
       }
     } else if (user_choice == 1) {
       int result = db.handleSignup(username, password);
-      System.out.println("Result " + result);
       if (result == 1) {
         System.out.println(Ansi.ansi().fg(RED).a("[-] Username is already taken").reset());
         cleanUp(true);
@@ -72,16 +70,19 @@ public class Main {
 
     String[][] entries;
     while (running) {
-      System.out.printf(
-          "Choices: \n"
-              + "0) View entries\n"
-              + "1) Add entry\n"
-              + "2) Delete entry\n"
-              + "3) Show password for entry\n"
-              + "4) Copy password of entry to clipboard\n"
-              + "5) Exit\n"
-              + "Enter choice: ");
 
+      System.out.printf(
+          "\u001B[33m" + // start yellow
+              "Choices: \n" +
+              "0) View entries\n" +
+              "1) Add entry\n" +
+              "2) Delete entry\n" +
+              "3) Show password for entry\n" +
+              "4) Copy password of entry to clipboard\n" +
+              "5) Exit\n" +
+              "Enter choice: " +
+              "\u001B[0m" // reset color back to default
+      );
       user_action_choice = scanner.nextInt();
       scanner.nextLine(); // consume the leftover newline
 
