@@ -26,21 +26,27 @@ public class Main {
 
     System.out.printf("%s %s %d", username, password, user_choice);
     if (user_choice == 0) {
-      db.handleLogin(username, password);
+      int result = db.handleLogin(username, password);
+      if (result != 0) {
+        db.closeDB();
+        // TODO: should do clean function
+        System.exit(1);
+      }
     } else if (user_choice == 1) {
       db.handleSignup(username, password);
     }
 
     /*
      * Workflow
-     * Signup -> salt generated + added to password = key generated
-     * Encrypt password and save it to users db along with username and salt
      *
-     * Login -> username provided hash is looked up added to given password = key
-     * generatd if key generated can decrypt that users password then allow if not
-     * then wrong
-     * password
+     * - Generate key from password + salt
+     * - Hash that password + salt for the users table
+     * - Use that key to encrypt columns
      *
+     * Login
+     * - Look at provided users salt, add it to the provided password and hash it,
+     * if it matches stored password hash for user then password is correct
+     * - Generate key from password + salt and decrypt columns
      *
      *
      */
