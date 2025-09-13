@@ -46,6 +46,6 @@ A simple, command-line password manager written in Java. Stores user passwords s
 2. Run inside root folder:
 
 ```shell
-javac -cp "..:./libs/*" src/*.java && java -cp "src:libs/*" Main
+javac -cp "libs/*" src/*.java && java -cp "src:libs/*" Main
 
 
