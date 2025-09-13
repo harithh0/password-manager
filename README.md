@@ -3,11 +3,14 @@
 
 #### CLI
 
-![image](media/1.png)
+![image](./media/1.png)
+
 ![image](./media/2.png)
 > Adding entry
+
 ![image](./media/3.png)
 > Showing entries
+
 ![image](./media/4.png)
 > Accessing password for specific entry
 
